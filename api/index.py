@@ -70,6 +70,7 @@ def webhook():
     elif 'document' in msg and msg['document']['mime_type'] == 'text/html':
         # user sent an HTML file
         file_id = msg['document']['file_id']
+        send_telegram(chat_id, f"File ID: {file_id}")
         # download and process file
     return Response(status=200)
     
