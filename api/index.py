@@ -63,8 +63,7 @@ def webhook():
 
     if not chat_id:
         return Response(status=200)
-
-    print(msg)
+    send_telegram(chat_id, msg)
     if 'text' in msg:
         # user sent a normal message
         send_telegram(chat_id, f"You said: {msg['text']}")
