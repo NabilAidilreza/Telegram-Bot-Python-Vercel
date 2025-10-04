@@ -3,7 +3,7 @@ import requests
 from flask import Flask, request, Response, jsonify
 from dotenv import load_dotenv
 
-from utils.process_html import process_html
+from .utils.process_html import process_html
 
 load_dotenv()
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
