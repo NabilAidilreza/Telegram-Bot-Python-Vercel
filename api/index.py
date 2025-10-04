@@ -57,42 +57,22 @@ def webhook():
     if not update or 'message' not in update:
         return Response(status=200)
 
-    msg = update.get('message', {})
-    chat = msg.get('chat', {})
-    chat_id = chat.get('id')
+    msg = update['message']
+    chat_id = msg['chat']['id']  # needed to reply
+    text = msg.get('text')       # text message (or None)
 
     if not chat_id:
         return Response(status=200)
 
-    # Handle text messages
-    if msg.get('text'):
-        text = msg.get('text')
-        # -------------------- DEVELOPMENT: text --------------------
-        send_telegram(chat_id, f"💬 You said: {text}")
-        # ------------------------------------------------------------
-
-    # Handle HTML files sent as documents
-    elif msg.get('document') and msg['document'].get('mime_type') == 'text/html':
-        file_id = msg['document'].get('file_id')
-        if file_id:
-            # Get file path from Telegram
-            resp = requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getFile?file_id={file_id}")
-            file_path = resp.json().get('result', {}).get('file_path')
-            if file_path:
-                # Download file content
-                file_url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}"
-                r = requests.get(file_url)
-                html_content = r.text
-
-                # -------------------- DEVELOPMENT: HTML --------------------
-                length = process_html(html_content)  # Call your separate processor
-                send_telegram(chat_id, f"HTML content length: {length}")
-                # ------------------------------------------------------------
-
-    else:
-        send_telegram(chat_id, "❌ Unsupported message type.")
-
-        return Response(status=200)
+    if 'text' in msg:
+        # user sent a normal message
+        send_telegram(chat_id, f"You said: {msg['text']}")
+    elif 'document' in msg and msg['document']['mime_type'] == 'text/html':
+        # user sent an HTML file
+        file_id = msg['document']['file_id']
+        # download and process file
+    return Response(status=200)
+    
 
 @app.route('/api/set_webhook', methods=['GET'])
 def manual_webhook():
