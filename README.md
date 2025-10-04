@@ -1,6 +1,8 @@
 # Telegram Webhook Bot
 
-A Telegram bot that forwards received messages to a specified webhook URL, built with Flask and deployable to Vercel.
+A template for Telegram bot that forwards received messages to a specified webhook URL, built with Flask and deployable to Vercel.
+
+**Original project by vladzima.**
 
 ## Features
 
