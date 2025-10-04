@@ -41,6 +41,20 @@ def set_webhook():
     except:
         return False
     
+def download_html(file_id):
+    # Step 1: Get file path from Telegram
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getFile?file_id={file_id}"
+    r = requests.get(url).json()
+    file_path = r['result']['file_path']
+
+    # Step 2: Download the actual file
+    file_url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}"
+    r = requests.get(file_url)
+    
+    # Step 3: Decode the content as text
+    html_content = r.text
+    return html_content
+    
 # -------------------- Routes --------------------
 
 @app.route('/')
@@ -67,13 +81,16 @@ def webhook():
     if 'text' in msg:
         # user sent a normal message
         send_telegram(chat_id, f"You said: {msg['text']}")
-    elif 'document' in msg and msg['document']['mime_type'] == 'text/html':
+    elif 'document' in msg :
         # user sent an HTML file
         file_id = msg['document']['file_id']
         send_telegram(chat_id, f"File ID: {file_id}")
+        html_content = download_html(file_id)
+        send_telegram(chat_id, f"Content Length: {len(html_content)}")
         # download and process file
     return Response(status=200)
-    
+
+
 
 @app.route('/api/set_webhook', methods=['GET'])
 def manual_webhook():
