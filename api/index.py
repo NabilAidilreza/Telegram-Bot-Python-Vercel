@@ -1,26 +1,21 @@
 import os
 import json
-import logging
 import requests
-from flask import Flask, request, Response
+from flask import Flask, request, Response, jsonify
 from dotenv import load_dotenv
 
 # -------------------- Setup --------------------
 load_dotenv()
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 VERCEL_URL = os.getenv('VERCEL_URL')
-WEBHOOK_URL = os.getenv('WEBHOOK_URL')
 
 app = Flask(__name__)
 
 # -------------------- Helper Functions --------------------
 def send_telegram_message(chat_id, text):
     if not TELEGRAM_TOKEN:
-        logger.error("TELEGRAM_TOKEN not set")
-        return False
+        return False, "TELEGRAM_TOKEN not set"
     try:
         resp = requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
@@ -28,42 +23,45 @@ def send_telegram_message(chat_id, text):
             timeout=10
         )
         resp.raise_for_status()
-        return True
+        return True, "Message sent"
     except Exception as e:
-        logger.error(f"Failed to send message: {e}")
-        return False
+        return False, str(e)
 
 def get_webhook_url():
-    """Determine the URL for Telegram webhook."""
-    return f"https://{VERCEL_URL}/api/webhook" if VERCEL_URL else None
+    if not VERCEL_URL:
+        return None
+    return f"https://{VERCEL_URL}/api/webhook"
 
 def set_telegram_webhook():
     url = get_webhook_url()
     if not TELEGRAM_TOKEN or not url:
-        logger.error("Cannot set webhook, missing TELEGRAM_TOKEN or VERCEL_URL")
         return False
     try:
-        resp = requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook",
-                             json={"url": url}, timeout=10)
+        resp = requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook",
+            json={"url": url},
+            timeout=10
+        )
         resp.raise_for_status()
-        logger.info(f"Webhook set: {url}")
         return resp.json().get("ok", False)
-    except Exception as e:
-        logger.error(f"Webhook setup failed: {e}")
+    except Exception:
         return False
 
 # -------------------- Routes --------------------
 @app.route('/')
 def home():
-    return {"status": "ok", "telegram_set": bool(TELEGRAM_TOKEN), "webhook_url": WEBHOOK_URL}
+    if not TELEGRAM_TOKEN:
+        return jsonify({"error": "TELEGRAM_TOKEN not set"}), 404
+    if not VERCEL_URL:
+        return jsonify({"error": "VERCEL_URL not set"}), 404
+    return jsonify({"status": "ok", "telegram_set": True})
 
 @app.route('/api/webhook', methods=['POST'])
 def webhook():
-    """Main Telegram webhook handler."""
     try:
         update = request.get_json()
         if not update or 'message' not in update:
-            return Response(status=200)
+            return Response(status=200)  # Telegram expects 200
 
         msg = update['message']
         chat_id = msg['chat']['id']
@@ -74,36 +72,32 @@ def webhook():
             return Response(status=200)
 
         # -------------------- BEGIN DEVELOPMENT HERE --------------------
-        # Add your custom processing logic below
-        # Example: echo back the received message
+        # Example: echo message back
         send_telegram_message(chat_id, f"💬 You said: {text}")
         # -----------------------------------------------------------------
 
-        # Forward to optional external webhook
-        forward_url = WEBHOOK_URL or get_webhook_url()
-        if forward_url:
-            try:
-                requests.post(forward_url, json=msg, timeout=10).raise_for_status()
-            except Exception as e:
-                logger.warning(f"Forwarding failed: {e}")
+        return Response(status=200)
 
     except Exception as e:
-        logger.error(f"Webhook error: {e}")
-    return Response(status=200)
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/set_webhook', methods=['GET'])
 def manual_set_webhook():
-    return {"success": set_telegram_webhook()}
+    success = set_telegram_webhook()
+    if success:
+        return jsonify({"success": True})
+    return jsonify({"success": False}), 500
 
 @app.route('/api/test', methods=['GET'])
 def test():
     chat_id = request.args.get('chat_id')
     if not chat_id:
-        return {"error": "chat_id required"}, 400
-    success = send_telegram_message(chat_id, "🔄 Test message from bot")
-    return {"success": success}
+        return jsonify({"error": "chat_id required"}), 400
 
-
+    success, message = send_telegram_message(chat_id, "🔄 Test message from bot")
+    if success:
+        return jsonify({"success": True, "message": message})
+    return jsonify({"success": False, "message": message}), 500
 
 # -------------------- Auto webhook setup --------------------
 if os.getenv("VERCEL") == "1":
